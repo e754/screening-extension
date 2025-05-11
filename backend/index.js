@@ -10,7 +10,7 @@ const app = express();
 app.use(cors());
 
 app.use(express.json());
-
+console.log("test");
 const PORT = process.env.PORT || 3001;
 
 app.post('/gemini', async (req, res) => {
