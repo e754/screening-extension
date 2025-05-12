@@ -39,7 +39,7 @@ async function logArticles() {
 async function analyzeArticle(study, context) {
   console.log("COntext here")
   console.log(context);
-  const response = await fetch('http://localhost:3001/gemini', {
+  const response = await fetch('https://screening-extension.onrender.com/gemini', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

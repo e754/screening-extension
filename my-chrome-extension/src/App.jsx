@@ -92,7 +92,7 @@ function App() {
 
       </div>
       <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
+        This Chrome extension does <strong>not</strong> collect, store, or transmit any personal or sensitive user data.
       </p>
     </>
   );

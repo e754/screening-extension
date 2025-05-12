@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "React Chrome Extension",
+    "name": "Convidence Screening Support",
     "version": "1.0.0",
-    "description": "A simple React app as a Chrome extension",
+    "description": "Helps screen for you",
     "host_permissions": ["<all_urls>"],
     "action": {
       "default_popup": "index.html"
@@ -13,5 +13,10 @@
           "matches": ["<all_urls>"],
           "js": ["content.js"]
         }
-      ]
-  }
+      ],
+    "icons" : {
+        "16": "icon.png",
+        "48": "icon.png",
+        "128": "icon.png"
+    }
+}
