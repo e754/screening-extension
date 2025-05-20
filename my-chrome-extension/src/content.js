@@ -1,5 +1,54 @@
 
-async function logArticles() {
+async function findCriterias() {
+  return new Promise((resolve) => {
+    //things to return
+    let includeList = [];
+    let excludeList = [];
+
+    observer.disconnect();
+
+    //click button to get criterias
+    const criteriaButton = document.querySelector('#show-review-criteria');
+    if (criteriaButton) {
+      criteriaButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      console.log("Clicked criteria button");
+      const main = document.querySelector('main#main');
+
+      //waitget it to load
+      const criteriaObserver = new MutationObserver((mutations, obs) => {
+        const criteriaSections = document.querySelectorAll('.webpack-pages-StudyList-ReviewEligibilityCriteria-ReviewEligibilityCriteria-module__rowItem');
+        if (criteriaSections.length > 0) {
+          console.log("Criteria sections found:", criteriaSections.length);
+
+          //alternate between inclusion and exclusion for sections
+          let include = false;
+          criteriaSections.forEach(section => {
+            include = !include;
+            const criteriaItems = section.querySelectorAll('li > p');
+            //add all criterias here
+            criteriaItems.forEach(item => {
+              const text = item.innerText.trim();
+              if (include) includeList.push(text);
+              else excludeList.push(text);
+            });
+          });
+
+          obs.disconnect();
+          resolve([includeList, excludeList]);
+        }
+      });
+
+      criteriaObserver.observe(main, { childList: true, subtree: true });
+    } else {
+      // Fallback if button isn't found
+      resolve([[], []]);
+    }
+  });
+}
+
+ 
+
+async function logArticles(include, exclude) {
   // Temporarily stop observing to prevent self-triggering
   observer.disconnect();
 
@@ -17,7 +66,7 @@ async function logArticles() {
       context = context + " " +abstract.innerText.trim();
     }
     if (!studies[i].dataset.aiProcessed) {
-      await analyzeArticle(studies[i], context);
+      await analyzeArticle(studies[i], context, include, exclude);
     }
     // Prevent adding duplicate buttons
     const place = studies[i].querySelector('p.ref-ids')
@@ -36,7 +85,9 @@ async function logArticles() {
     }
   }
 
-async function analyzeArticle(study, context) {
+async function analyzeArticle(study, context, include, exclude) {
+  const inclusionText = include.map(item => item.trim()).join('\n');
+  const exclusionText = exclude.map(item => item.trim()).join('\n');
   console.log("COntext here")
   console.log(context);
   const response = await fetch('https://screening-extension.onrender.com/gemini', {
@@ -67,37 +118,10 @@ async function analyzeArticle(study, context) {
         Below are the screening criteria, marked by <<<>>>:
 
         **Inclusion Criteria**
-        <<<Include  
-        Studies must be published in English.
+        <<<${inclusionText}>>>
 
-        Research must take place in the United States, Ignoring International studies.
-
-        Studies must focus on farmworkers in the U.S.
-
-        Only include empirical research (peer-reviewed articles, government reports, evaluations, white papers).
-
-        Any methodology is acceptable.
-
-        Research must present empirical evidence, not purely theoretical or commentary-based.
-
-        The primary aim must be to evaluate the function or impact of federal policies (WPS or Field Sanitation Standard) that protect farmworkers from environmental or occupational hazards.
-
-        Include studies that mention WPS or Field Sanitation in title or abstract.
-
-        Must assess at least one actionable component of a federal regulation (e.g., pesticide notification, re-entry intervals).
-
-        Must be published on or after January 1, 1990.>>>
-
-        Exclusion Criteria
-        <<<Exclude
-
-        Exclude articles that mention federal regulations but do not analyze their function, effectiveness, or impact.
-
-        Exclude studies focused only on state-level regulations, unless they clearly evaluate how a federal regulation is implemented at the state level.
-
-        Exclude general discussions of farmworker conditions without analysis of specific regulatory provisions.
-
-        Exclude purely descriptive or theoretical articles without empirical data.>>>
+        **Exclusion Criteria**
+        <<<${exclusionText}>>>
 
         Look through the text for material potentially related to each criteria, rationalize with given information, use Maybe if we really arne't sure.
         <<<${context}>>>"`
@@ -155,9 +179,6 @@ function insertCriteriaToPage(criteriaJson, study) {
   });
 }
 
-
-  // highlightVoteButtons(); // Highlight buttons
-
   // Resume observing after changes
   observer.observe(document.body, {
     childList: true,
@@ -165,17 +186,6 @@ function insertCriteriaToPage(criteriaJson, study) {
   });
 
 }
-// function highlightVoteButtons() {
-//   const buttons = document.querySelectorAll('button.button.vote-option.primary');
-//   buttons.forEach(btn => {
-//     btn.style.backgroundColor = '#ffeb3b';   // bright yellow
-//     btn.style.color = '#000';               // black text
-//     btn.style.fontWeight = 'bold';
-//     btn.style.border = '2px solid #fbc02d';
-//     btn.style.borderRadius = '4px';
-//     btn.title = 'Highlighted by extension';
-//   });
-// }
 
 // Set up MutationObserver
 const observer = new MutationObserver((mutations) => {
@@ -187,5 +197,11 @@ const observer = new MutationObserver((mutations) => {
   }
 });
 
-// Initial run
-logArticles();
+//initial run
+(async () => {
+  const [includeList, excludeList] = await findCriterias();
+  console.log("Include:", includeList);
+  console.log("Exclude:", excludeList);
+
+  logArticles(includeList, excludeList); // Only call after criteria is loaded
+})();
