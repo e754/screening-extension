@@ -1,4 +1,3 @@
-
 async function findCriterias() {
   return new Promise((resolve) => {
     //things to return
@@ -11,15 +10,12 @@ async function findCriterias() {
     const criteriaButton = document.querySelector('#show-review-criteria');
     if (criteriaButton) {
       criteriaButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-      console.log("Clicked criteria button");
       const main = document.querySelector('main#main');
 
       //waitget it to load
       const criteriaObserver = new MutationObserver((mutations, obs) => {
         const criteriaSections = document.querySelectorAll('.webpack-pages-StudyList-ReviewEligibilityCriteria-ReviewEligibilityCriteria-module__rowItem');
         if (criteriaSections.length > 0) {
-          console.log("Criteria sections found:", criteriaSections.length);
-
           //alternate between inclusion and exclusion for sections
           let include = false;
           criteriaSections.forEach(section => {
@@ -53,34 +49,55 @@ async function logArticles(include, exclude) {
   observer.disconnect();
 
   const studies = document.querySelectorAll('.reference.clearfix');
-  console.log("length", studies.length);
-
   for (let i = 0; i < studies.length; i++) {
-    const title = studies[i].querySelector('h3.title');
-    const abstract = studies[i].querySelector('div.abstract');
-
-    let context = title.innerText.trim();
-
-    if(abstract) {
-      console.log("Abstract exist")
-      context = context + " " +abstract.innerText.trim();
-    }
+    let buttonText = "AI Check Failed";
+    //if we havne't processed this yet, we will now
     if (!studies[i].dataset.aiProcessed) {
+
+      //find relevant informaation
+      const title = studies[i].querySelector('h3.title');
+      const abstract = studies[i].querySelector('div.abstract');
+      const fulltext = studies[i].querySelector('a.action-link');
+
+
+      //this button's text will include the source of our information
+  
+      let context = title.innerText.trim();
+      if(title) {buttonText = "AI checked for Title"}
+      //if abstract exist, add it to context and button text
+      if(abstract) {
+        console.log("Abstract exist");
+        context = context + " " +abstract.innerText.trim();
+        buttonText = buttonText + ", Abstract";
+      }
+
+      //if full text has been uploaded
+      if(fulltext) {
+        console.log("Full text exists");
+        const pdfUrl = fulltext?.href;
+        console.log(pdfUrl);
+        //make api call to backend to get relevant information
+        const call = await fetch('https://screening-extension.onrender.com/extract-pdf', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ pdfUrl })
+        });
+
+        const result = await call.json();
+
+        buttonText = buttonText + `, PDF`;
+        context = context + " " + result.text;
+        console.log(result.text);
+      }
       await analyzeArticle(studies[i], context, include, exclude);
     }
     // Prevent adding duplicate buttons
     const place = studies[i].querySelector('p.ref-ids')
     if (!place.querySelector('.log-study-btn')) {
       const button = document.createElement('button');
-      button.innerText = 'AI Check';
+      button.innerText = buttonText;
       button.className = 'log-study-btn'; // give it a class to identify
       button.style.marginTop = '10px';
-
-      button.addEventListener('click', async() => {
-
-      
-      });
-
       place.appendChild(button);
     }
   }
@@ -88,56 +105,52 @@ async function logArticles(include, exclude) {
 async function analyzeArticle(study, context, include, exclude) {
   const inclusionText = include.map(item => item.trim()).join('\n');
   const exclusionText = exclude.map(item => item.trim()).join('\n');
-  console.log("COntext here")
+  // console.log("COntext here")
   console.log(context);
-  const response = await fetch('https://screening-extension.onrender.com/gemini', {
+  const response = await fetch('https://screening-extension.onrender.com/gpt4-mini', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "gemini-2.5-flash-preview-04-17",
-      contents: 
-      `
-        You are assisting a researcher in conducting a structured literature review. Your task is to screen articles based on strict inclusion and exclusion criteria. Respond only with a valid JSON object structured as shown below. For each criterion, return "Yes", "No", or "Maybe"—based only on information available in the Title and Abstract provided. Do not add explanations or extra text.
-
-        Example format:
-
-        json
-        {
+      model: "gpt-4.1-mini",
+      contents: `
+      You are assisting a researcher in conducting a structured literature review. Your task is to screen articles based on strict inclusion and exclusion criteria. Respond only with a valid JSON object structured as shown below. For each criterion, return "Yes", "No", or "Maybe"—based only on information available in the Title and Abstract provided. Do not add explanations or extra text.
+      
+      Example format:
+      
+      {
         "Inclusion Criteria": {
-        "Studies must be published in English": "Yes",
-        ...
+          "Studies must be published in English": "Yes",
+          ...
         },
         "Exclusion Criteria": {
-        "Articles that mention regulations without analyzing their function, effectiveness, or impact will be excluded.": "Maybe",
-        ...
+          "Articles that mention regulations without analyzing their function, effectiveness, or impact will be excluded.": "Maybe",
+          ...
         }
-        }
+      }
+      
+      Interpret the criteria **strictly and conservatively**. When in doubt, respond with "Maybe".
+      
+      Below are the screening criteria, marked by <<<>>>:
+      
+      **Inclusion Criteria**
+      <<<${inclusionText}>>>
+      
+      **Exclusion Criteria**
+      <<<${exclusionText}>>>
+      
+      Look through the text for material potentially related to each criteria, rationalize with given information, use Maybe if we really aren't sure.
+      <<<${context}>>>
+      `
+    })
+  });
+  const data = await response.json();
 
-        Interpret the criteria **strictly and conservatively**. When in doubt, respond with "Maybe".
+  let rawText = data.candidates[0].content.parts[0].text;
 
-        Below are the screening criteria, marked by <<<>>>:
-
-        **Inclusion Criteria**
-        <<<${inclusionText}>>>
-
-        **Exclusion Criteria**
-        <<<${exclusionText}>>>
-
-        Look through the text for material potentially related to each criteria, rationalize with given information, use Maybe if we really arne't sure.
-        <<<${context}>>>"`
-    ,})
-    });
-    const data = await response.json();
-    console.log(data);
-
-    let rawText = data.candidates[0].content.parts[0].text;
-    console.log(rawText);
-
-    rawText = rawText.replace(/^```json\n/, "").replace(/```$/, "");
-    const parsedJson = JSON.parse(rawText);
-    insertCriteriaToPage(parsedJson, study);
-    console.log(parsedJson);
-    study.dataset.aiProcessed = "true"; // Mark this study as processed
+  rawText = rawText.replace(/^```json\n/, "").replace(/```$/, "");
+  const parsedJson = JSON.parse(rawText);
+  insertCriteriaToPage(parsedJson, study);
+  study.dataset.aiProcessed = "true"; // Mark this study as processed
 
 }
 
