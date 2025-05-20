@@ -2,8 +2,7 @@ import express from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
-
+import pdf from 'pdf-parse/lib/pdf-parse.js'; // Modified import path
 
 dotenv.config();
 
@@ -13,7 +12,8 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 
-console.log("test");
+console.log("Server started");
+
 
 app.post('/gemini', async (req, res) => {
   try {
@@ -45,32 +45,27 @@ app.post('/extract-pdf', async (req, res) => {
     const { pdfUrl } = req.body;
     if (!pdfUrl) return res.status(400).json({ error: 'pdfUrl is required' });
 
-    const response = await axios.get(pdfUrl, { responseType: 'arraybuffer' });
-    const pdfBuffer = response.data;
-
-    // Load PDF document from buffer
-    const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
-    const pdfDocument = await loadingTask.promise;
-
-    let fullText = '';
-
-    // Loop through all pages and extract text
-    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-      const page = await pdfDocument.getPage(pageNum);
-      const textContent = await page.getTextContent();
-
-      // Extract text items and concatenate
-      const pageText = textContent.items.map(item => item.str).join(' ');
-      fullText += pageText + '\n\n';
-    }
-
-    res.json({ text: fullText });
+    const response = await axios.get(pdfUrl, { 
+      responseType: 'arraybuffer'
+    });
+    
+    const data = await pdf(response.data);
+    
+    res.json({ 
+      success: true,
+      text: data.text,
+      pageCount: data.numpages
+    });
   } catch (error) {
     console.error('Error extracting PDF text:', error);
-    res.status(500).json({ error: 'Failed to extract PDF text' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to extract PDF text',
+      details: error.message 
+    });
   }
 });
 
-
 app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
