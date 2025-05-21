@@ -138,9 +138,11 @@ async function analyzeArticle(study, context, include, exclude) {
       **Exclusion Criteria**
       <<<${exclusionText}>>>
       
-      Look through the text for material potentially related to each criteria, rationalize with given information, use Maybe if we really aren't sure.
-      <<<${context}>>>
+      // Look through the text for material potentially related to each criteria, rationalize with given information, use Maybe if we really aren't sure.
       `
+
+      //      <<<${context}>>>
+
     })
   });
   const data = await response.json();
