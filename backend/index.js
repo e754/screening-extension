@@ -10,35 +10,42 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
 const PORT = process.env.PORT || 3001;
 
 console.log("Server started");
 
-
-app.post('/gemini', async (req, res) => {
+console.log("gpt4-mini?");
+app.post('/gpt4-mini', async (req, res) => {
   try {
     const { model, contents } = req.body;
-
+    console.log("request recieved");
+    if (!model || !contents) {
+      return res.status(400).json({ error: "Missing 'model' or 'contents' in request body." });
+    }
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      'https://api.openai.com/v1/chat/completions',
       {
-        contents: [{ role: "user", parts: [{ text: contents }] }],
-        generationConfig: {
-          temperature: 0,
-        },
+        model: model, // e.g. "gpt-4.1-mini"
+        messages: [
+          { role: "user", content: contents }
+        ],
+        temperature: 0
       },
       {
-        headers: { 'Content-Type': 'application/json' },
-        params: { key: process.env.GEMINI_API_KEY },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        }
       }
     );
-
     res.json(response.data);
   } catch (error) {
-    console.error("Error calling Gemini API:", error.response?.data || error.message);
-    res.status(500).json({ error: "Failed to fetch from Gemini API" });
+    console.error("Error calling GPT-4.1 Mini API:", error.response?.data || error.message);
+    res.status(500).json({ error: "Failed to fetch from GPT-4.1 Mini API" });
   }
 });
+
 
 app.post('/extract-pdf', async (req, res) => {
   try {
